@@ -1,0 +1,156 @@
+package SlidingPuzzle;
+
+import java.util.*;
+
+class PuzzleNode implements Comparable<PuzzleNode> {
+    int[][] board;
+    int g; // Cost to reach this node from the start
+    int h; // Heuristic cost (estimated cost to reach the goal)
+    PuzzleNode parent;
+    int[] zeroPosition;
+
+    public PuzzleNode(int[][] board, int g, int h, PuzzleNode parent) {
+        this.board = board;
+        this.g = g;
+        this.h = h;
+        this.parent = parent;
+        this.zeroPosition = findZeroPosition();
+    }
+
+    // Find the position of the zero (empty) tile in the puzzle
+    private int[] findZeroPosition() {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (board[i][j] == 0) {
+                    return new int[] { i, j };
+                }
+            }
+        }
+        return null;
+    }
+
+    // Calculate the total cost (f = g + h)
+    public int getTotalCost() {
+        return g + h;
+    }
+
+    @Override
+    public int compareTo(PuzzleNode other) {
+        return this.getTotalCost() - other.getTotalCost();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this)
+            return true;
+        if (!(obj instanceof PuzzleNode))
+            return false;
+        PuzzleNode other = (PuzzleNode) obj;
+        return Arrays.deepEquals(this.board, other.board);
+    }
+}
+
+public class SlidingPuzzle {
+    private final int[][] goalState = { { 1, 2, 3 }, { 4, 5, 6 }, { 7, 8, 0 } };
+    private PriorityQueue<PuzzleNode> openList = new PriorityQueue<>();
+    private Set<PuzzleNode> closedSet = new HashSet<>();
+
+    // Heuristic function - Manhattan distance
+    private int calculateHeuristic(int[][] board) {
+        int h = 0;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                int value = board[i][j];
+                if (value != 0) {
+                    int targetRow = (value - 1) / 3;
+                    int targetCol = (value - 1) % 3;
+                    h += Math.abs(i - targetRow) + Math.abs(j - targetCol);
+                }
+            }
+        }
+        return h;
+    }
+
+    // Get possible moves from a given node
+    private List<PuzzleNode> getPossibleMoves(PuzzleNode node) {
+        int[][] directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        List<PuzzleNode> possibleMoves = new ArrayList<>();
+        int zeroRow = node.zeroPosition[0];
+        int zeroCol = node.zeroPosition[1];
+
+        for (int[] dir : directions) {
+            int newRow = zeroRow + dir[0];
+            int newCol = zeroCol + dir[1];
+            if (newRow >= 0 && newRow < 3 && newCol >= 0 && newCol < 3) {
+                int[][] newBoard = new int[3][3];
+                for (int i = 0; i < 3; i++) {
+                    newBoard[i] = node.board[i].clone();
+                }
+                newBoard[zeroRow][zeroCol] = newBoard[newRow][newCol];
+                newBoard[newRow][newCol] = 0;
+                PuzzleNode newNode = new PuzzleNode(newBoard, node.g + 1, calculateHeuristic(newBoard), node);
+                possibleMoves.add(newNode);
+            }
+        }
+        return possibleMoves;
+    }
+
+    // Trace back the solution from the goal state to the initial state
+    private List<PuzzleNode> traceSolution(PuzzleNode goalNode) {
+        List<PuzzleNode> solution = new ArrayList<>();
+        PuzzleNode currentNode = goalNode;
+        while (currentNode != null) {
+            solution.add(0, currentNode);
+            currentNode = currentNode.parent;
+        }
+        return solution;
+    }
+
+    // A* algorithm to solve the puzzle
+    public List<PuzzleNode> solvePuzzle(int[][] initialState) {
+        PuzzleNode initialNode = new PuzzleNode(initialState, 0, calculateHeuristic(initialState), null);
+        openList.add(initialNode);
+
+        while (!openList.isEmpty()) {
+            PuzzleNode currentNode = openList.poll();
+            closedSet.add(currentNode);
+
+            if (Arrays.deepEquals(currentNode.board, goalState)) {
+                return traceSolution(currentNode);
+            }
+
+            List<PuzzleNode> possibleMoves = getPossibleMoves(currentNode);
+            for (PuzzleNode move : possibleMoves) {
+                if (!closedSet.contains(move) && !openList.contains(move)) {
+                    openList.add(move);
+                }
+            }
+        }
+
+        // If there is no solution
+        return null;
+    }
+
+    public static void main(String[] args) {
+        SlidingPuzzle solver = new SlidingPuzzle();
+
+        int[][] puzzle = {
+                { 0, 1, 3 },
+                { 4, 2, 5 },
+                { 7, 8, 6 }
+        };
+
+        List<PuzzleNode> solution = solver.solvePuzzle(puzzle);
+
+        if (solution != null) {
+            for (PuzzleNode node : solution) {
+                for (int[] row : node.board) {
+                    System.out.println(Arrays.toString(row));
+                }
+                System.out.println();
+            }
+        } else {
+            System.out.println("No solution found.");
+        }
+    }
+}
